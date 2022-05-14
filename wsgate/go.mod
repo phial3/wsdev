@@ -1,4 +1,4 @@
-module wegate
+module github.com/wsgate
 
 go 1.17
 
