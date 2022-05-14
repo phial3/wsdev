@@ -74,14 +74,14 @@ func (gs *gatewayServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // subscribeHandler accepts the WebSocket connection and then subscribes
 // it to all future messages.
 func (gs *gatewayServer) subscribeHandler(w http.ResponseWriter, req *http.Request) {
-	c, err := websocket.Accept(w, req, nil)
+	conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 	if err != nil {
-		gs.logf("%v", err)
+		gs.logf("subscribe handler ws connect error, %v", err)
 		return
 	}
-	defer c.Close(websocket.StatusInternalError, "")
+	defer conn.Close(websocket.StatusInternalError, "")
 
-	err = gs.subscribe(req.Context(), c)
+	err = gs.subscribe(req.Context(), conn)
 	if errors.Is(err, context.Canceled) {
 		return
 	}
@@ -90,7 +90,7 @@ func (gs *gatewayServer) subscribeHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 	if err != nil {
-		gs.logf("%v", err)
+		gs.logf("ws connection error, %v", err)
 		return
 	}
 }
@@ -107,25 +107,26 @@ func (gs *gatewayServer) subHandler(w http.ResponseWriter, r *http.Request) {
 //
 // It uses CloseRead to keep reading from the connection to process control
 // messages and cancel the context if the connection drops.
-func (gs *gatewayServer) subscribe(ctx context.Context, c *websocket.Conn) error {
-	ctx = c.CloseRead(ctx)
+func (gs *gatewayServer) subscribe(ctx context.Context, conn *websocket.Conn) error {
+	ctx = conn.CloseRead(ctx)
 
 	key, _ := GenerateRandomString(18)
-	s := &subscriber{
+	subsci := &subscriber{
 		msgs: make(chan []byte, gs.subscriberMessageBuffer),
 		closeSlow: func() {
 			gs.logf("closeSlow called, closing %v", key)
-			c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			conn.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
 		},
 	}
-	gs.addSubscriber(key, s)
+	gs.addSubscriber(key, subsci)
 	defer gs.deleteSubscriber(key)
 
 	for {
 		select {
-		case msg := <-s.msgs:
-			err := writeTimeout(ctx, time.Second*5, c, msg)
+		case msg := <-subsci.msgs:
+			err := writeTimeout(ctx, time.Second*5, conn, msg)
 			if err != nil {
+				gs.logf("error writing timeout to ws, %v", err)
 				return err
 			}
 		case <-ctx.Done():
@@ -251,9 +252,9 @@ func (gs *gatewayServer) selectAllSubscribers() ([]*subscriber, error) {
 	return ss, nil
 }
 
-func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {
+func writeTimeout(ctx context.Context, timeout time.Duration, conn *websocket.Conn, msg []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	return c.Write(ctx, websocket.MessageText, msg)
+	return conn.Write(ctx, websocket.MessageText, msg)
 }

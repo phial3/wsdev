@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	//log.SetFlags(0)
+	log.SetFlags(0)
 
 	err := run()
 	if err != nil {
@@ -22,25 +22,25 @@ func main() {
 // run initializes the gatewayServer and then
 // starts a http.Server for the passed in address.
 func run() error {
-	//if len(os.Args) < 2 {
+	// if len(os.Args) < 2 {
 	//	return errors.New("please provide an address to listen on as the first argument")
-	//}
+	// }
 
-	l, err := net.Listen("tcp", ":11082")
+	listener, err := net.Listen("tcp", ":11082")
 	if err != nil {
 		return err
 	}
-	log.Printf("listening on http://%v", l.Addr())
+	log.Printf("listening on http://%v", listener.Addr())
 
 	cs := newGatewayServer()
-	s := &http.Server{
+	server := &http.Server{
 		Handler:      cs,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Second * 10,
 	}
 	errc := make(chan error, 1)
 	go func() {
-		errc <- s.Serve(l)
+		errc <- server.Serve(listener)
 	}()
 
 	sigs := make(chan os.Signal, 1)
@@ -55,5 +55,5 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	return s.Shutdown(ctx)
+	return server.Shutdown(ctx)
 }
