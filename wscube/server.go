@@ -28,8 +28,13 @@ type Server struct {
 	endpointsMap           map[Endpoint]Channel
 }
 
-func NewServer(cubeInstance Cube, devMode bool, enableRouting bool, endpointsMap map[Endpoint]Channel,
-	onlyAuthorizedRequests bool, jwtSecret string, port int) *Server {
+func NewServer(
+	cubeInstance Cube,
+	devMode bool,
+	enableRouting bool,
+	endpointsMap map[Endpoint]Channel,
+	onlyAuthorizedRequests bool,
+	jwtSecret string, port int) *Server {
 	return &Server{
 		cubeInstance:           cubeInstance,
 		upgrade:                websocket.Upgrader{},
@@ -319,7 +324,6 @@ func (s *Server) CloseUserConnections(userId UserId, reason string) {
 }
 
 func (s *Server) SendMessage(userId *UserId, deviceId *DeviceId, messageType MessageType, message []byte) {
-
 	connections := []*Connection{}
 	if deviceId != nil {
 		connections = s.connections.GetDeviceConnections(*userId, *deviceId)

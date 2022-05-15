@@ -1,21 +1,17 @@
 package handler
 
 import (
-	"log"
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/wsdall/internal/logger"
+	"github.com/wsdall/internal/tools"
 	"github.com/wsdall/internal/wshub"
 )
 
 type Handler struct {
 	wshub *wshub.WSHub
-}
-
-func New() *Handler {
-	return &Handler{
-		wshub: wshub.New(),
-	}
 }
 
 var upgrader = websocket.Upgrader{
@@ -26,12 +22,38 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
+func New() *Handler {
+	return &Handler{
+		wshub: wshub.New(),
+	}
+}
+
+func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		logger.Errorf("connect error, ", err)
+		return nil, errors.New("connect error")
 	}
-	// TODO: add autentication
-	usn := r.Header.Get("username")
-	h.wshub.Register(ws, usn)
+
+	// TODO: authenticate
+	// _, err = h.Auth(r)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return
+	// }
+	h.wshub.Register("userId", ws)
+	return ws, nil
+}
+
+// Auth is a middleware for websocket connection
+func (h *Handler) Auth(req *http.Request) (string, error) {
+	token := req.Header.Get("token")
+	if token == "" {
+		return "", errors.New("token is empty")
+	}
+	claims, err := tools.ParseToken(token)
+	if err != nil {
+		return "", errors.New("token is invalid")
+	}
+	return claims.Phone, nil
 }

@@ -1,12 +1,14 @@
 package main
 
 import (
-	logger "github.com/wsdall/internal"
+	"github.com/wsdall/internal/config"
+	"github.com/wsdall/internal/logger"
 	"github.com/wsdall/internal/server"
 )
 
 func main() {
-	logger.GetLogger().Info("Starting ws gateway server...")
+	logger.Info("Starting ws gateway server...")
 	srv := server.New()
+	config.LoadConfig()
 	srv.Start()
 }
