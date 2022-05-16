@@ -38,29 +38,36 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		logger.Errorf("connection error %v", err)
 		return
 	}
-	go s.handleMessages(conn)
+	go s.onMessage(conn)
+}
+
+func (s *Server) onConnected(conn *websocket.Conn) {
 
 }
 
-func (s *Server) handleMessages(conn *websocket.Conn) {
+func (s *Server) onMessage(conn *websocket.Conn) {
 	for {
 		messageType, message, err := conn.ReadMessage()
 		if err != nil {
+			logger.Errorf("read msg error %v", err)
 			conn.Close()
 			return
 		}
 
 		switch messageType {
 		case websocket.TextMessage:
+			conn.WriteMessage(websocket.TextMessage, message)
 		case websocket.BinaryMessage:
+			conn.WriteMessage(websocket.BinaryMessage, message)
 		case websocket.CloseMessage:
-			s.onMessage(messageType, conn, message)
+			conn.Close()
+		default:
+			logger.Warnf("unknown message type %v", messageType)
 			return
 		}
 	}
 }
 
-func (s *Server) onMessage(msgType int, conn *websocket.Conn, message []byte) {
-	logger.Infof("message %s", message)
-	conn.WriteMessage(msgType, message)
+func (s *Server) onClose(conn *websocket.Conn) {
+
 }
